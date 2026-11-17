@@ -1,5 +1,5 @@
 using DisasterLocation.Core;
-using Microsoft.Data.Sqlite;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using Platform.DAL.Contexts;
 
@@ -42,7 +42,8 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
             return new DisasterSaveResult(disaster, true);
         }
         catch (DbUpdateException ex) when (disaster.ClientRequestId.HasValue &&
-            ex.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 })
+            ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation,
+                SchemaName: PlatformDatabase.DisasterSchema, ConstraintName: "IX_Desastres_ClientRequestId" })
         {
             context.Entry(disaster).State = EntityState.Detached;
             var existing = await GetByClientRequestIdAsync(disaster.ClientRequestId.Value, ct);

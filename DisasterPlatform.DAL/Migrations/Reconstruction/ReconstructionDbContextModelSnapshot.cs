@@ -3,11 +3,12 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Platform.DAL.Contexts;
 
 #nullable disable
 
-namespace Platform.DAL.Migrations.Reconstruction
+namespace DisasterPlatform.DAL.Migrations.Reconstruction
 {
     [DbContext(typeof(ReconstructionDbContext))]
     partial class ReconstructionDbContextModelSnapshot : ModelSnapshot
@@ -15,49 +16,54 @@ namespace Platform.DAL.Migrations.Reconstruction
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
+            modelBuilder
+                .HasDefaultSchema("reconstruction")
+                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Platform.DAL.Models.AuditEntry", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Actor")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("AfterJson")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("BeforeJson")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("DataJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasDefaultValue("{}");
 
                     b.Property<string>("Detail")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<int>("DisasterId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("EventId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ProjectId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -66,7 +72,7 @@ namespace Platform.DAL.Migrations.Reconstruction
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("ReconstructionAudit", (string)null);
+                    b.ToTable("ReconstructionAudit", "reconstruction");
                 });
 
             modelBuilder.Entity("Platform.DAL.Models.InboxMessage", b =>
@@ -74,82 +80,82 @@ namespace Platform.DAL.Migrations.Reconstruction
                     b.Property<string>("ConsumerName")
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(160)
-                        .HasColumnType("TEXT")
+                        .HasColumnType("character varying(160)")
                         .HasDefaultValue("reconstruction.timeline");
 
                     b.Property<Guid>("EventId")
-                        .HasColumnType("TEXT")
+                        .HasColumnType("uuid")
                         .HasColumnName("Id");
 
                     b.Property<string>("OutcomeJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasDefaultValue("");
 
                     b.Property<DateTimeOffset>("ProcessedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("ConsumerName", "EventId");
 
-                    b.ToTable("InboxMessages", (string)null);
+                    b.ToTable("InboxMessages", "reconstruction");
                 });
 
             modelBuilder.Entity("Platform.DAL.Models.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Attempts")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<long>("CreatedUnixMs")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
                     b.Property<string>("EventType")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("PayloadJson")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("SentAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("SentAt", "CreatedUnixMs");
 
-                    b.ToTable("OutboxMessages", (string)null);
+                    b.ToTable("OutboxMessages", "reconstruction");
                 });
 
             modelBuilder.Entity("Platform.DAL.Models.TimelineEntry", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<int>("DisasterId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("EventId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("EventType")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ProjectId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -158,43 +164,41 @@ namespace Platform.DAL.Migrations.Reconstruction
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("ReconstructionTimeline", (string)null);
+                    b.ToTable("ReconstructionTimeline", "reconstruction");
                 });
 
             modelBuilder.Entity("Reconstruction.Domain.Models.DisasterFundingReservation", b =>
                 {
                     b.Property<int>("DisasterId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("ReservedAmount")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("ReservedAmount")
+                        .HasColumnType("numeric");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
                     b.HasKey("DisasterId");
 
-                    b.ToTable("ReconstructionFundingReservations", (string)null);
+                    b.ToTable("ReconstructionFundingReservations", "reconstruction");
                 });
 
             modelBuilder.Entity("Reconstruction.Domain.Models.ProgressReport", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ActivityId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Actor")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
-                    b.Property<string>("ActualCost")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("ActualCost")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Documents")
                         .IsRequired()
@@ -211,13 +215,13 @@ namespace Platform.DAL.Migrations.Reconstruction
                         .HasDefaultValueSql("'[]'");
 
                     b.Property<DateTimeOffset>("RegisteredAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("RequestId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -227,149 +231,147 @@ namespace Platform.DAL.Migrations.Reconstruction
                         .IsUnique()
                         .HasFilter("\"RequestId\" IS NOT NULL");
 
-                    b.ToTable("ReconstructionReports", (string)null);
+                    b.ToTable("ReconstructionReports", "reconstruction");
                 });
 
             modelBuilder.Entity("Reconstruction.Domain.Models.ProjectActivity", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("Budget")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("Budget")
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset>("DueAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(250)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(250)");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Responsible")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTimeOffset>("StartsAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("ReconstructionActivities", (string)null);
+                    b.ToTable("ReconstructionActivities", "reconstruction");
                 });
 
             modelBuilder.Entity("Reconstruction.Domain.Models.ReconstructionProject", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("BudgetLockedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("ClosedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ContractRecordedBy")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT")
+                        .HasColumnType("character varying(200)")
                         .HasDefaultValue("");
 
                     b.Property<DateTimeOffset?>("ContractSignedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Contractor")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("DisasterId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("FinalBudget")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("FinalBudget")
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset?>("FormalizationSavedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("FundingSource")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("FundingSourceId")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT")
+                        .HasColumnType("character varying(200)")
                         .HasDefaultValue("donations");
 
                     b.Property<Guid>("ProposalId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Responsible")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("SignedContractReference")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT")
+                        .HasColumnType("character varying(1000)")
                         .HasDefaultValue("");
 
                     b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ProposalId")
                         .IsUnique();
 
-                    b.ToTable("ReconstructionProjects", (string)null);
+                    b.ToTable("ReconstructionProjects", "reconstruction");
                 });
 
             modelBuilder.Entity("Reconstruction.Domain.Models.ReconstructionProposal", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("AssessmentCount")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("AssetType")
                         .IsRequired()
                         .HasMaxLength(120)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(120)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Damage")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<int>("DisasterId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Evaluations")
                         .IsConcurrencyToken()
@@ -382,82 +384,81 @@ namespace Platform.DAL.Migrations.Reconstruction
                     b.Property<bool>("IsSelectedForReconstruction")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
                     b.Property<int>("Priority")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("ProposedBudget")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("ProposedBudget")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("ReviewFingerprint")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("text")
                         .HasDefaultValue("");
 
                     b.Property<Guid?>("SelectedForProjectId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Status")
                         .IsConcurrencyToken()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("bigint")
                         .HasDefaultValue(1L);
 
                     b.Property<string>("Zone")
                         .IsRequired()
                         .HasMaxLength(180)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(180)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("DisasterId", "Zone", "AssetType")
                         .IsUnique()
-                        .HasFilter("\"Status\" = 0 AND \"IsSelectedForReconstruction\" = 0");
+                        .HasFilter("\"Status\" = 0 AND \"IsSelectedForReconstruction\" = FALSE");
 
-                    b.ToTable("ReconstructionProposals", (string)null);
+                    b.ToTable("ReconstructionProposals", "reconstruction");
                 });
 
             modelBuilder.Entity("Reconstruction.Domain.Models.WorkflowItem", b =>
                 {
                     b.Property<int>("Kind")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("SubjectId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("DataJson")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<int>("DisasterId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid?>("ProjectId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("ProposalId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("SourceEventId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
                     b.HasKey("Kind", "SubjectId");
 
@@ -465,7 +466,7 @@ namespace Platform.DAL.Migrations.Reconstruction
 
                     b.HasIndex("DisasterId", "IsActive");
 
-                    b.ToTable("ReconstructionWorkflow", (string)null);
+                    b.ToTable("ReconstructionWorkflow", "reconstruction");
                 });
 
             modelBuilder.Entity("Reconstruction.Domain.Models.ProgressReport", b =>

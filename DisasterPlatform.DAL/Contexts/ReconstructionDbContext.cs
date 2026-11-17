@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Reconstruction.Domain.Models;
 using Platform.DAL.Models;
 using Reconstruction.Application.Ports;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Platform.DAL.Contexts;
 
@@ -18,8 +19,18 @@ public sealed class ReconstructionDbContext(DbContextOptions<ReconstructionDbCon
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
     public DbSet<TimelineEntry> TimelineEntries => Set<TimelineEntry>();
 
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        // PostgreSQL timestamps have microsecond precision; keep tracked values consistent with their persisted form.
+        foreach (var property in ChangeTracker.Entries().Where(entry => entry.State is EntityState.Added or EntityState.Modified)
+            .SelectMany(entry => entry.Properties).Where(property => property.CurrentValue is DateTimeOffset))
+            property.CurrentValue = PlatformDatabase.Timestamp((DateTimeOffset)property.CurrentValue!);
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema(PlatformDatabase.ReconstructionSchema);
         // The domain assigns these GUIDs, including new children of tracked aggregates.
         modelBuilder.Entity<ReconstructionProposal>(b =>
         {
@@ -35,9 +46,9 @@ public sealed class ReconstructionDbContext(DbContextOptions<ReconstructionDbCon
             b.Property<Guid?>("SelectedForProjectId");
             b.Property(x => x.Zone).HasMaxLength(180).IsRequired();
             b.Property(x => x.AssetType).HasMaxLength(120).IsRequired();
-            b.Property(x => x.ProposedBudget).HasConversion<string>().HasColumnType("TEXT");
+            b.Property(x => x.ProposedBudget).HasColumnType("numeric");
             b.HasIndex(x => new { x.DisasterId, x.Zone, x.AssetType }).IsUnique()
-                .HasFilter("\"Status\" = 0 AND \"IsSelectedForReconstruction\" = 0");
+                .HasFilter("\"Status\" = 0 AND \"IsSelectedForReconstruction\" = FALSE");
         });
         modelBuilder.Entity<ReconstructionProject>(b =>
         {
@@ -48,7 +59,7 @@ public sealed class ReconstructionDbContext(DbContextOptions<ReconstructionDbCon
             b.Property(x => x.ContractRecordedBy).HasMaxLength(200).IsRequired().HasDefaultValue("");
             b.HasIndex(x => x.ProposalId).IsUnique();
             b.Property(x => x.Version).IsConcurrencyToken();
-            b.Property(x => x.FinalBudget).HasConversion<string>().HasColumnType("TEXT");
+            b.Property(x => x.FinalBudget).HasColumnType("numeric");
             b.Property(x => x.FundingSource).HasMaxLength(200).IsRequired();
             b.Property(x => x.FundingSourceId).HasMaxLength(200).HasDefaultValue("donations").IsRequired();
             b.Property(x => x.Responsible).HasMaxLength(200).IsRequired();
@@ -63,7 +74,7 @@ public sealed class ReconstructionDbContext(DbContextOptions<ReconstructionDbCon
             b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.Name).HasMaxLength(250).IsRequired();
             b.Property(x => x.Responsible).HasMaxLength(200).IsRequired();
-            b.Property(x => x.Budget).HasConversion<string>().HasColumnType("TEXT");
+            b.Property(x => x.Budget).HasColumnType("numeric");
             b.HasMany(x => x.Reports).WithOne().HasForeignKey(x => x.ActivityId)
                 .OnDelete(DeleteBehavior.Cascade);
             b.Navigation(x => x.Reports).HasField("_reports").UsePropertyAccessMode(PropertyAccessMode.Field);
@@ -72,7 +83,7 @@ public sealed class ReconstructionDbContext(DbContextOptions<ReconstructionDbCon
         {
             b.ToTable("ReconstructionReports"); b.HasKey(x => x.Id);
             b.Property(x => x.Id).ValueGeneratedNever();
-            b.Property(x => x.ActualCost).HasConversion<string>().HasColumnType("TEXT");
+            b.Property(x => x.ActualCost).HasColumnType("numeric");
             b.Property(x => x.Evidence).HasJsonCollection("EvidenceJson").IsRequired();
             b.Property(x => x.Documents).HasJsonCollection("DocumentsJson").IsRequired();
             b.Property(x => x.Actor).HasMaxLength(200).IsRequired();
@@ -82,7 +93,7 @@ public sealed class ReconstructionDbContext(DbContextOptions<ReconstructionDbCon
         {
             b.ToTable("ReconstructionFundingReservations"); b.HasKey(x => x.DisasterId);
             b.Property(x => x.DisasterId).ValueGeneratedNever();
-            b.Property(x => x.ReservedAmount).HasConversion<string>().HasColumnType("TEXT");
+            b.Property(x => x.ReservedAmount).HasColumnType("numeric");
             b.Property(x => x.Version).IsConcurrencyToken();
         });
         modelBuilder.Entity<WorkflowItem>(b =>
@@ -119,5 +130,9 @@ public sealed class ReconstructionDbContext(DbContextOptions<ReconstructionDbCon
             b.HasIndex(x => x.EventId).IsUnique();
             b.HasIndex(x => x.ProjectId);
         });
+        var utc = new ValueConverter<DateTimeOffset, DateTimeOffset>(value => value.ToUniversalTime(), value => value);
+        foreach (var property in modelBuilder.Model.GetEntityTypes().SelectMany(entity => entity.GetProperties())
+            .Where(property => (Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType) == typeof(DateTimeOffset)))
+            property.SetValueConverter(utc);
     }
 }

@@ -10,12 +10,13 @@ public sealed class DisasterDbContext(DbContextOptions<DisasterDbContext> option
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema(PlatformDatabase.DisasterSchema);
         var disaster = modelBuilder.Entity<Disaster>();
         disaster.ToTable("Desastres", table =>
         {
-            table.HasCheckConstraint("CK_Desastres_Severidad", "Severidad BETWEEN 1 AND 5");
-            table.HasCheckConstraint("CK_Desastres_Latitud", "Latitud BETWEEN -90 AND 90");
-            table.HasCheckConstraint("CK_Desastres_Longitud", "Longitud BETWEEN -180 AND 180");
+            table.HasCheckConstraint("CK_Desastres_Severidad", "\"Severidad\" BETWEEN 1 AND 5");
+            table.HasCheckConstraint("CK_Desastres_Latitud", "\"Latitud\" BETWEEN -90 AND 90");
+            table.HasCheckConstraint("CK_Desastres_Longitud", "\"Longitud\" BETWEEN -180 AND 180");
         });
         modelBuilder.Entity<Platform.DAL.Models.DisasterPhaseAudit>(b =>
         {

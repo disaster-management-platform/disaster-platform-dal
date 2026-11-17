@@ -3,11 +3,12 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Platform.DAL.Contexts;
 
 #nullable disable
 
-namespace Platform.DAL.Migrations.Disasters
+namespace DisasterPlatform.DAL.Migrations.Disasters
 {
     [DbContext(typeof(DisasterDbContext))]
     partial class DisasterDbContextModelSnapshot : ModelSnapshot
@@ -15,53 +16,60 @@ namespace Platform.DAL.Migrations.Disasters
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
+            modelBuilder
+                .HasDefaultSchema("disasters")
+                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("DisasterLocation.Core.Disaster", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<Guid?>("ClientRequestId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Descripcion")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<double>("Latitud")
-                        .HasColumnType("REAL");
+                        .HasColumnType("double precision");
 
                     b.Property<double>("Longitud")
-                        .HasColumnType("REAL");
+                        .HasColumnType("double precision");
 
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(120)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(120)");
 
                     b.Property<int>("Phase")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("integer")
                         .HasDefaultValue(0);
 
                     b.Property<double?>("Radio")
-                        .HasColumnType("REAL");
+                        .HasColumnType("double precision");
 
                     b.Property<int>("Severidad")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Ubicacion")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("bigint")
                         .HasDefaultValue(1L);
 
                     b.HasKey("Id");
@@ -69,13 +77,13 @@ namespace Platform.DAL.Migrations.Disasters
                     b.HasIndex("ClientRequestId")
                         .IsUnique();
 
-                    b.ToTable("Desastres", null, t =>
+                    b.ToTable("Desastres", "disasters", t =>
                         {
-                            t.HasCheckConstraint("CK_Desastres_Latitud", "Latitud BETWEEN -90 AND 90");
+                            t.HasCheckConstraint("CK_Desastres_Latitud", "\"Latitud\" BETWEEN -90 AND 90");
 
-                            t.HasCheckConstraint("CK_Desastres_Longitud", "Longitud BETWEEN -180 AND 180");
+                            t.HasCheckConstraint("CK_Desastres_Longitud", "\"Longitud\" BETWEEN -180 AND 180");
 
-                            t.HasCheckConstraint("CK_Desastres_Severidad", "Severidad BETWEEN 1 AND 5");
+                            t.HasCheckConstraint("CK_Desastres_Severidad", "\"Severidad\" BETWEEN 1 AND 5");
                         });
                 });
 
@@ -83,33 +91,33 @@ namespace Platform.DAL.Migrations.Disasters
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Actor")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<int>("After")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<int>("Before")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<int>("DisasterId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("Version")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
                     b.HasIndex("DisasterId", "Version")
                         .IsUnique();
 
-                    b.ToTable("DisasterPhaseAudit", (string)null);
+                    b.ToTable("DisasterPhaseAudit", "disasters");
                 });
 #pragma warning restore 612, 618
         }
