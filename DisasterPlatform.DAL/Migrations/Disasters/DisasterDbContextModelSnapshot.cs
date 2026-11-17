@@ -119,6 +119,15 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
 
                     b.ToTable("DisasterPhaseAudit", "disasters");
                 });
+
+            modelBuilder.Entity("Platform.DAL.Models.DisasterPhaseAudit", b =>
+                {
+                    b.HasOne("DisasterLocation.Core.Disaster", null)
+                        .WithMany()
+                        .HasForeignKey("DisasterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
 #pragma warning restore 612, 618
         }
     }

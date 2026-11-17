@@ -22,6 +22,7 @@ public sealed class DisasterDbContext(DbContextOptions<DisasterDbContext> option
         {
             b.ToTable("DisasterPhaseAudit"); b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.DisasterId, x.Version }).IsUnique();
+            b.HasOne<Disaster>().WithMany().HasForeignKey(x => x.DisasterId).OnDelete(DeleteBehavior.Restrict);
         });
         disaster.Property(d => d.Phase).HasDefaultValue(DisasterPhase.Registered);
         disaster.Property(d => d.Version).HasDefaultValue(1L).IsConcurrencyToken();

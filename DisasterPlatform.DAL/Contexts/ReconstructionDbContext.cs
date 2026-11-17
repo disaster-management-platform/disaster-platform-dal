@@ -58,6 +58,8 @@ public sealed class ReconstructionDbContext(DbContextOptions<ReconstructionDbCon
             b.Property(x => x.SignedContractReference).HasMaxLength(1000).IsRequired().HasDefaultValue("");
             b.Property(x => x.ContractRecordedBy).HasMaxLength(200).IsRequired().HasDefaultValue("");
             b.HasIndex(x => x.ProposalId).IsUnique();
+            b.HasOne<ReconstructionProposal>().WithOne().HasForeignKey<ReconstructionProject>(x => x.ProposalId)
+                .OnDelete(DeleteBehavior.Restrict);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.Property(x => x.FinalBudget).HasColumnType("numeric");
             b.Property(x => x.FundingSource).HasMaxLength(200).IsRequired();

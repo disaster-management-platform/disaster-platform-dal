@@ -487,6 +487,15 @@ namespace DisasterPlatform.DAL.Migrations.Reconstruction
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Reconstruction.Domain.Models.ReconstructionProject", b =>
+                {
+                    b.HasOne("Reconstruction.Domain.Models.ReconstructionProposal", null)
+                        .WithOne()
+                        .HasForeignKey("Reconstruction.Domain.Models.ReconstructionProject", "ProposalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Reconstruction.Domain.Models.ProjectActivity", b =>
                 {
                     b.Navigation("Reports");
