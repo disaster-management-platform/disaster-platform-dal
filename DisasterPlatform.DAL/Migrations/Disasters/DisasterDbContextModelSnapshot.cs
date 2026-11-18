@@ -31,13 +31,22 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AttentionLevel")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("ClientRequestId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("CreationSnapshot")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("Descripcion")
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("DisasterTypeId")
+                        .HasColumnType("integer");
 
                     b.Property<double>("Latitud")
                         .HasColumnType("double precision");
@@ -58,13 +67,22 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                     b.Property<double?>("Radio")
                         .HasColumnType("double precision");
 
+                    b.Property<DateTimeOffset?>("RegisteredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Severidad")
                         .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Ubicacion")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
@@ -77,13 +95,82 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                     b.HasIndex("ClientRequestId")
                         .IsUnique();
 
+                    b.HasIndex("DisasterTypeId");
+
                     b.ToTable("Desastres", "disasters", t =>
                         {
+                            t.HasCheckConstraint("CK_Desastres_AttentionLevel", "\"AttentionLevel\" IS NULL OR \"AttentionLevel\" BETWEEN 1 AND 4");
+
                             t.HasCheckConstraint("CK_Desastres_Latitud", "\"Latitud\" BETWEEN -90 AND 90");
 
                             t.HasCheckConstraint("CK_Desastres_Longitud", "\"Longitud\" BETWEEN -180 AND 180");
 
+                            t.HasCheckConstraint("CK_Desastres_Radio", "\"Radio\" IS NULL OR (\"Radio\" > 0 AND \"Radio\" <= 1000000)");
+
                             t.HasCheckConstraint("CK_Desastres_Severidad", "\"Severidad\" BETWEEN 1 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("DisasterLocation.Core.DisasterType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 7L, null, null, null, null, null);
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("DisasterTypes", "disasters");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            IsActive = true,
+                            Name = "Terremoto"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            IsActive = true,
+                            Name = "Inundación"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            IsActive = true,
+                            Name = "Incendio"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            IsActive = true,
+                            Name = "Deslizamiento"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            IsActive = true,
+                            Name = "Huracán"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            IsActive = true,
+                            Name = "Erupción volcánica"
                         });
                 });
 
@@ -103,11 +190,32 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                     b.Property<int>("Before")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Changes")
+                        .HasColumnType("jsonb");
+
+                    b.Property<bool?>("CommitmentsConfirmed")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("DisasterId")
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("PhaseChanged");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Success");
 
                     b.Property<long>("Version")
                         .HasColumnType("bigint");
@@ -118,6 +226,14 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                         .IsUnique();
 
                     b.ToTable("DisasterPhaseAudit", "disasters");
+                });
+
+            modelBuilder.Entity("DisasterLocation.Core.Disaster", b =>
+                {
+                    b.HasOne("DisasterLocation.Core.DisasterType", null)
+                        .WithMany()
+                        .HasForeignKey("DisasterTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Platform.DAL.Models.DisasterPhaseAudit", b =>
