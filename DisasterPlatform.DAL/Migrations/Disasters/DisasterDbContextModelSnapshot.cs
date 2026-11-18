@@ -76,6 +76,10 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long>("SyncSequence")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Ubicacion")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -96,6 +100,9 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                         .IsUnique();
 
                     b.HasIndex("DisasterTypeId");
+
+                    b.HasIndex("SyncSequence")
+                        .IsUnique();
 
                     b.ToTable("Desastres", "disasters", t =>
                         {

@@ -42,6 +42,9 @@ public static class PlatformDatabase
         return new DateTimeOffset(value.Ticks - value.Ticks % 10, TimeSpan.Zero);
     }
 
+    public static bool IsPersistenceFailure(Exception exception) =>
+        exception is DbUpdateException or NpgsqlException or TimeoutException;
+
     public static bool IsConflict(DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation,
             SchemaName: ReconstructionSchema } error && error.ConstraintName is

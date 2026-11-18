@@ -45,6 +45,8 @@ public sealed class DisasterDbContext(DbContextOptions<DisasterDbContext> option
         });
         disaster.Property(d => d.Phase).HasDefaultValue(DisasterPhase.Registered);
         disaster.Property(d => d.Version).HasDefaultValue(1L).IsConcurrencyToken();
+        disaster.Property<long>("SyncSequence").ValueGeneratedOnAddOrUpdate();
+        disaster.HasIndex("SyncSequence").IsUnique();
         disaster.HasKey(d => d.Id);
         disaster.HasIndex(d => d.ClientRequestId).IsUnique();
         disaster.Property(d => d.Nombre).IsRequired().HasMaxLength(120);

@@ -2,6 +2,7 @@ namespace DisasterLocation.Core;
 
 public interface IDisasterRepository
 {
+    Task<DisasterSyncPage> GetChangesAsync(long after, int limit, CancellationToken ct = default);
     Task<IReadOnlyList<Disaster>> GetAllAsync(CancellationToken ct = default);
     Task<Disaster?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Disaster?> GetByClientRequestIdAsync(Guid clientRequestId, CancellationToken ct = default);
@@ -15,3 +16,5 @@ public interface IDisasterRepository
     Task<DisasterSaveResult> AddAsync(Disaster disaster, CancellationToken ct = default);
 }
 public sealed record DisasterSaveResult(Disaster Disaster, bool Created);
+
+public sealed record DisasterSyncPage(IReadOnlyList<Disaster> Items, long Cursor, bool HasMore);

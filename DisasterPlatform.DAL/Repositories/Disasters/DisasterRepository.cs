@@ -9,6 +9,16 @@ namespace Platform.DAL.Repositories.Disasters;
 
 public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRepository
 {
+    public async Task<DisasterSyncPage> GetChangesAsync(long after, int limit, CancellationToken ct = default)
+    {
+        var rows = await context.Disasters.AsNoTracking().Where(d => EF.Property<long>(d, "SyncSequence") > after)
+            .OrderBy(d => EF.Property<long>(d, "SyncSequence")).Take(limit + 1)
+            .Select(d => new { Disaster = d, Sequence = EF.Property<long>(d, "SyncSequence") }).ToListAsync(ct);
+        var more = rows.Count > limit;
+        var page = rows.Take(limit).ToArray();
+        return new DisasterSyncPage(page.Select(x => x.Disaster).ToArray(), page.Length == 0 ? after : page[^1].Sequence, more);
+    }
+
     public async Task<IReadOnlyList<Disaster>> GetAllAsync(CancellationToken ct = default) =>
         await context.Disasters.AsNoTracking().OrderByDescending(x => x.Id).ToListAsync(ct);
     public Task<Disaster?> GetByIdAsync(int id, CancellationToken ct = default) =>
