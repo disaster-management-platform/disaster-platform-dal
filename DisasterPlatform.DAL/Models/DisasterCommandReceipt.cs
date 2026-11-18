@@ -8,6 +8,8 @@ public sealed class DisasterCommandReceipt
     public DateTimeOffset? PublishedAt { get; set; }
     public DateTimeOffset? LeaseUntil { get; set; }
     public Guid? LeaseId { get; set; }
+    public int RecoveryCount { get; set; }
+    public DateTimeOffset? NextRecoveryAt { get; set; }
     public int Attempts { get; set; }
     public string? ResultJson { get; set; }
 }

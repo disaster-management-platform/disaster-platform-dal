@@ -266,11 +266,17 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                     b.Property<DateTimeOffset?>("LeaseUntil")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("NextRecoveryAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("ReceivedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RecoveryCount")
+                        .HasColumnType("integer");
 
                     b.Property<string>("ResultJson")
                         .HasColumnType("jsonb");
