@@ -5,6 +5,7 @@ namespace Platform.DAL.Contexts;
 
 public sealed class DisasterDbContext(DbContextOptions<DisasterDbContext> options) : DbContext(options)
 {
+    public DbSet<Platform.DAL.Models.DisasterCommandReceipt> Commands => Set<Platform.DAL.Models.DisasterCommandReceipt>();
     public DbSet<DisasterReport> Reports => Set<DisasterReport>();
     public DbSet<Platform.DAL.Models.DisasterOutboxMessage> Outbox => Set<Platform.DAL.Models.DisasterOutboxMessage>();
     public DbSet<DisasterType> DisasterTypes => Set<DisasterType>();
@@ -23,6 +24,13 @@ public sealed class DisasterDbContext(DbContextOptions<DisasterDbContext> option
             b.HasData(new DisasterType { Id = 1, Name = "Terremoto" }, new DisasterType { Id = 2, Name = "Inundación" },
                 new DisasterType { Id = 3, Name = "Incendio" }, new DisasterType { Id = 4, Name = "Deslizamiento" },
                 new DisasterType { Id = 5, Name = "Huracán" }, new DisasterType { Id = 6, Name = "Erupción volcánica" });
+        });
+        modelBuilder.Entity<Platform.DAL.Models.DisasterCommandReceipt>(b =>
+        {
+            b.ToTable("DisasterCommandReceipts"); b.HasKey(x => x.ClientRequestId);
+            b.Property(x => x.CommandJson).HasColumnType("jsonb").Metadata.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Throw);
+            b.Property(x => x.ResultJson).HasColumnType("jsonb");
+            b.HasIndex(x => x.ReceivedAt).HasFilter("\"ResultJson\" IS NULL");
         });
         modelBuilder.Entity<DisasterReport>(b =>
         {

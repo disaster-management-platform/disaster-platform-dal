@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddDbContext<DisasterDbContext>(options => options.UseNpgsql(
             PlatformDatabase.ResolveConnectionString(connectionString),
             postgres => postgres.MigrationsHistoryTable(PlatformDatabase.DisasterHistory, PlatformDatabase.DisasterSchema)));
+        services.AddScoped<DisasterCommandStore>();
         services.AddScoped<IDisasterRepository, DisasterRepository>();
         return services;
     }
