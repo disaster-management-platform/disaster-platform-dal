@@ -16,6 +16,10 @@ public sealed class Disaster
     public DateTimeOffset? RegisteredAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
     public AttentionLevel? AttentionLevel { get; set; }
+    public string? RegisteringOrganizationId { get; set; }
+    public string? EmergencyResponsibleId { get; set; }
+    public string? GeographyJson { get; set; }
+    public string? OrganizationsJson { get; set; }
     public string? CreationSnapshot { get; set; }
     public DisasterPhase Phase { get; set; }
     public long Version { get; set; } = 1;

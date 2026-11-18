@@ -5,6 +5,8 @@ namespace Platform.DAL.Contexts;
 
 public sealed class DisasterDbContext(DbContextOptions<DisasterDbContext> options) : DbContext(options)
 {
+    public DbSet<DisasterReport> Reports => Set<DisasterReport>();
+    public DbSet<Platform.DAL.Models.DisasterOutboxMessage> Outbox => Set<Platform.DAL.Models.DisasterOutboxMessage>();
     public DbSet<DisasterType> DisasterTypes => Set<DisasterType>();
     public DbSet<Disaster> Disasters => Set<Disaster>();
     public DbSet<Platform.DAL.Models.DisasterPhaseAudit> PhaseAudit => Set<Platform.DAL.Models.DisasterPhaseAudit>();
@@ -22,7 +24,33 @@ public sealed class DisasterDbContext(DbContextOptions<DisasterDbContext> option
                 new DisasterType { Id = 3, Name = "Incendio" }, new DisasterType { Id = 4, Name = "Deslizamiento" },
                 new DisasterType { Id = 5, Name = "Huracán" }, new DisasterType { Id = 6, Name = "Erupción volcánica" });
         });
+        modelBuilder.Entity<DisasterReport>(b =>
+        {
+            b.ToTable("DisasterReports"); b.HasKey(x => x.Id);
+            b.Property(x => x.SourceId).HasMaxLength(200);
+            b.Property(x => x.SourceReportId).HasMaxLength(200);
+            b.Property(x => x.ReceivedBy).HasMaxLength(300);
+            b.Property(x => x.RegisteringOrganizationId).HasMaxLength(200);
+            b.Property(x => x.OriginalContent).HasColumnType("text");
+            b.Property(x => x.ReceiptSnapshot).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.SourceId, x.SourceReportId }).IsUnique();
+            b.HasOne<Disaster>().WithMany().HasForeignKey(x => x.DisasterId).OnDelete(DeleteBehavior.Restrict);
+            foreach (var property in b.Metadata.GetProperties().Where(x => x.Name != nameof(DisasterReport.DisasterId)))
+                property.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Throw);
+        });
+        modelBuilder.Entity<Platform.DAL.Models.DisasterOutboxMessage>(b =>
+        {
+            b.ToTable("DisasterOutboxMessages"); b.HasKey(x => x.Id);
+            b.Property(x => x.EventType).HasMaxLength(100);
+            b.Property(x => x.Payload).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.DisasterId, x.Version, x.EventType }).IsUnique();
+            b.HasOne<Disaster>().WithMany().HasForeignKey(x => x.DisasterId).OnDelete(DeleteBehavior.Restrict);
+        });
         var disaster = modelBuilder.Entity<Disaster>();
+        disaster.Property(x => x.RegisteringOrganizationId).HasMaxLength(200);
+        disaster.Property(x => x.EmergencyResponsibleId).HasMaxLength(200);
+        disaster.Property(x => x.GeographyJson).HasColumnType("jsonb");
+        disaster.Property(x => x.OrganizationsJson).HasColumnType("jsonb");
         disaster.HasOne<DisasterType>().WithMany().HasForeignKey(x => x.DisasterTypeId).OnDelete(DeleteBehavior.Restrict);
         disaster.Property(x => x.CreationSnapshot).HasColumnType("jsonb").Metadata
             .SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Throw);

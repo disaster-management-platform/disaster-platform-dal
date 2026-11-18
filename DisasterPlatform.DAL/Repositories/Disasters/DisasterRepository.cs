@@ -65,6 +65,7 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
         audit.Reason = reason;
         audit.CommitmentsConfirmed = commitmentsConfirmed;
         context.PhaseAudit.Add(audit);
+        Enqueue(after!, "DisasterPhaseChanged", now);
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return true;
@@ -86,6 +87,9 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
         if (affected == 0) return false;
         var after = await GetByIdAsync(disaster.Id, ct);
         context.PhaseAudit.Add(Audit(before, after!, actor, "Updated", now));
+        if (before.AttentionLevel != after!.AttentionLevel) Enqueue(after, "DisasterAttentionChanged", now);
+        if (before.Latitud != after.Latitud || before.Longitud != after.Longitud || before.Radio != after.Radio)
+            Enqueue(after, "DisasterAreaChanged", now);
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return true;
@@ -94,7 +98,8 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
     private static string Snapshot(Disaster d) => JsonSerializer.Serialize(new
     {
         d.Nombre, d.Ubicacion, d.Severidad, d.Descripcion, d.Latitud, d.Longitud, d.Radio,
-        d.DisasterTypeId, d.StartedAt, d.RegisteredAt, d.UpdatedAt, d.AttentionLevel, d.Phase, d.Version
+        d.DisasterTypeId, d.StartedAt, d.RegisteredAt, d.UpdatedAt, d.AttentionLevel, d.Phase, d.Version,
+        d.RegisteringOrganizationId, d.EmergencyResponsibleId, d.GeographyJson, d.OrganizationsJson
     });
     private static DisasterPhaseAudit Audit(Disaster before, Disaster after, string actor, string operation, DateTimeOffset now)
     {
@@ -110,6 +115,106 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
             After = after.Phase, Version = after.Version, Actor = actor, OccurredAt = now,
             Operation = operation, Changes = JsonSerializer.Serialize(changes) };
     }
+
+    public Task<DisasterReport?> GetReportBySourceAsync(string sourceId, string reportId, CancellationToken ct) =>
+        context.Reports.AsNoTracking().SingleOrDefaultAsync(x => x.SourceId == sourceId && x.SourceReportId == reportId, ct);
+
+    public Task<DisasterReport?> GetReportAsync(Guid id, CancellationToken ct) =>
+        context.Reports.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
+
+    public async Task<IReadOnlyList<DisasterReport>> GetReportsAsync(int? disasterId, CancellationToken ct) =>
+        await context.Reports.AsNoTracking().Where(x => x.DisasterId == disasterId)
+            .OrderByDescending(x => x.ReceivedAt).ToListAsync(ct);
+
+    public async Task<DisasterReportReceipt> ReceiveReportAsync(DisasterReport report, Disaster? preliminary, CancellationToken ct)
+    {
+        var existing = await GetReportBySourceAsync(report.SourceId, report.SourceReportId, ct);
+        if (existing is not null) return new(existing, false);
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        try
+        {
+            if (preliminary is not null)
+            {
+                preliminary.CreationSnapshot = Snapshot(preliminary);
+                context.Disasters.Add(preliminary);
+                await context.SaveChangesAsync(ct);
+                report.DisasterId = preliminary.Id;
+                var now = preliminary.RegisteredAt!.Value;
+                Enqueue(preliminary, "DisasterDetected", now, report.SourceId);
+                context.PhaseAudit.Add(new DisasterPhaseAudit { Id = Guid.NewGuid(), DisasterId = preliminary.Id,
+                    Before = preliminary.Phase, After = preliminary.Phase, Actor = report.ReceivedBy,
+                    OccurredAt = now, Operation = "Detected", Version = preliminary.Version,
+                    Changes = JsonSerializer.Serialize(new { SourceId = report.SourceId, ReportId = report.Id, After = preliminary }) });
+            }
+            context.Reports.Add(report);
+            await context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return new(report, true);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.UniqueViolation, SchemaName: PlatformDatabase.DisasterSchema,
+                ConstraintName: "IX_DisasterReports_SourceId_SourceReportId" })
+        {
+            await transaction.RollbackAsync(ct);
+            context.ChangeTracker.Clear();
+            existing = await context.Reports.AsNoTracking().SingleAsync(x => x.SourceId == report.SourceId && x.SourceReportId == report.SourceReportId, ct);
+            return new(existing, false);
+        }
+    }
+
+    public async Task<bool> AssociateReportAsync(int disasterId, Guid reportId, long expectedVersion, string actor, CancellationToken ct)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var before = await GetByIdAsync(disasterId, ct);
+        if (before is null || before.Version != expectedVersion) return false;
+        var now = PlatformDatabase.Timestamp(DateTimeOffset.UtcNow);
+        if (await context.Disasters.Where(x => x.Id == disasterId && x.Version == expectedVersion)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.Version, expectedVersion + 1).SetProperty(x => x.UpdatedAt, now), ct) == 0) return false;
+        if (await context.Reports.Where(x => x.Id == reportId && x.DisasterId == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.DisasterId, disasterId), ct) == 0) return false;
+        var after = await GetByIdAsync(disasterId, ct);
+        var audit = Audit(before, after!, actor, "ReportAssociated", now);
+        audit.Changes = JsonSerializer.Serialize(new { ReportId = reportId, DisasterId = new { Before = (int?)null, After = disasterId }, Version = after!.Version });
+        context.PhaseAudit.Add(audit);
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> UpdateContextAsync(int id, long expectedVersion, string actor, string operation,
+        string? geographyJson, string? organizationsJson, string? registeringOrganizationId,
+        string? emergencyResponsibleId, string? sourceId, CancellationToken ct)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var before = await GetByIdAsync(id, ct);
+        if (before is null || before.Version != expectedVersion) return false;
+        var now = PlatformDatabase.Timestamp(DateTimeOffset.UtcNow);
+        var query = context.Disasters.Where(x => x.Id == id && x.Version == expectedVersion);
+        var affected = operation == "GeographyUpdated"
+            ? await query.ExecuteUpdateAsync(s => s.SetProperty(x => x.GeographyJson, geographyJson)
+                .SetProperty(x => x.Version, expectedVersion + 1).SetProperty(x => x.UpdatedAt, now), ct)
+            : await query.ExecuteUpdateAsync(s => s.SetProperty(x => x.OrganizationsJson, organizationsJson)
+                .SetProperty(x => x.RegisteringOrganizationId, registeringOrganizationId)
+                .SetProperty(x => x.EmergencyResponsibleId, emergencyResponsibleId)
+                .SetProperty(x => x.Version, expectedVersion + 1).SetProperty(x => x.UpdatedAt, now), ct);
+        if (affected == 0) return false;
+        var after = await GetByIdAsync(id, ct);
+        var audit = Audit(before, after!, actor, operation, now);
+        audit.Reason = sourceId;
+        context.PhaseAudit.Add(audit);
+        if (operation == "GeographyUpdated") Enqueue(after!, "DisasterAreaChanged", now, sourceId);
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<DisasterAlert>> GetAlertsAsync(int id, CancellationToken ct) =>
+        await context.Outbox.AsNoTracking().Where(x => x.DisasterId == id).OrderBy(x => x.Version)
+            .Select(x => new DisasterAlert(x.Id, x.EventType, x.OccurredAt, x.Version, x.Payload)).ToListAsync(ct);
+
+    private void Enqueue(Disaster disaster, string eventType, DateTimeOffset now, string? sourceId = null) =>
+        context.Outbox.Add(new DisasterOutboxMessage { Id = Guid.NewGuid(), DisasterId = disaster.Id,
+            EventType = eventType, Version = disaster.Version, OccurredAt = now, Payload = JsonSerializer.Serialize(new { Disaster = JsonSerializer.Deserialize<JsonElement>(Snapshot(disaster)), SourceId = sourceId }) });
 
     public async Task<DisasterSaveResult> AddAsync(Disaster disaster, CancellationToken ct = default)
     {

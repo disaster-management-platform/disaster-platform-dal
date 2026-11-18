@@ -48,6 +48,13 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                     b.Property<int?>("DisasterTypeId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("EmergencyResponsibleId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("GeographyJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<double>("Latitud")
                         .HasColumnType("double precision");
 
@@ -59,6 +66,9 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("OrganizationsJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<int>("Phase")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -69,6 +79,10 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
 
                     b.Property<DateTimeOffset?>("RegisteredAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RegisteringOrganizationId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<int>("Severidad")
                         .HasColumnType("integer");
@@ -116,6 +130,58 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
 
                             t.HasCheckConstraint("CK_Desastres_Severidad", "\"Severidad\" BETWEEN 1 AND 5");
                         });
+                });
+
+            modelBuilder.Entity("DisasterLocation.Core.DisasterReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("DisasterId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OriginalContent")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReceiptSnapshot")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReceivedBy")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("RegisteringOrganizationId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SourceId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SourceKind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceReportId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DisasterId");
+
+                    b.HasIndex("SourceId", "SourceReportId")
+                        .IsUnique();
+
+                    b.ToTable("DisasterReports", "disasters");
                 });
 
             modelBuilder.Entity("DisasterLocation.Core.DisasterType", b =>
@@ -181,6 +247,38 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                         });
                 });
 
+            modelBuilder.Entity("Platform.DAL.Models.DisasterOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DisasterId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DisasterId", "Version", "EventType")
+                        .IsUnique();
+
+                    b.ToTable("DisasterOutboxMessages", "disasters");
+                });
+
             modelBuilder.Entity("Platform.DAL.Models.DisasterPhaseAudit", b =>
                 {
                     b.Property<Guid>("Id")
@@ -241,6 +339,23 @@ namespace DisasterPlatform.DAL.Migrations.Disasters
                         .WithMany()
                         .HasForeignKey("DisasterTypeId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DisasterLocation.Core.DisasterReport", b =>
+                {
+                    b.HasOne("DisasterLocation.Core.Disaster", null)
+                        .WithMany()
+                        .HasForeignKey("DisasterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Platform.DAL.Models.DisasterOutboxMessage", b =>
+                {
+                    b.HasOne("DisasterLocation.Core.Disaster", null)
+                        .WithMany()
+                        .HasForeignKey("DisasterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Platform.DAL.Models.DisasterPhaseAudit", b =>
