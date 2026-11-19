@@ -172,13 +172,52 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.Version, expectedVersion + 1).SetProperty(x => x.UpdatedAt, now), ct) == 0) return false;
         if (await context.Reports.Where(x => x.Id == reportId && x.DisasterId == null)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.DisasterId, disasterId), ct) == 0) return false;
+        var reports = await context.Reports.AsNoTracking().Where(x => x.DisasterId == disasterId)
+            .OrderBy(x => x.ReceivedAt).ThenBy(x => x.Id).Select(x => new { x.Id, x.OriginalContent }).ToListAsync(ct);
+        var points = new List<(double Latitude, double Longitude)>();
+        if (before.CreationSnapshot is not null) AddPoint(before.CreationSnapshot, points);
+        foreach (var report in reports) AddPoint(report.OriginalContent, points);
+        var incoming = new List<(double Latitude, double Longitude)>();
+        AddPoint(reports.Single(r => r.Id == reportId).OriginalContent, incoming);
+        var area = incoming.Count == 0 ? null : DisasterArea.FromPoints(points);
+        if (area is not null)
+        {
+            var previous = before.GeographyJson is null ? null : JsonSerializer.Deserialize<DisasterGeography>(before.GeographyJson);
+            var geography = JsonSerializer.Serialize(new DisasterGeography(area.Polygon, previous?.Municipalities,
+                previous?.Neighborhoods, previous?.RiskZones));
+            if (System.Text.Encoding.UTF8.GetByteCount(geography) > 65_536)
+                throw new ArgumentOutOfRangeException(nameof(reports), "La geografía supera 64 KiB.");
+            await context.Disasters.Where(x => x.Id == disasterId).ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.Latitud, area.Latitude).SetProperty(x => x.Longitud, area.Longitude)
+                .SetProperty(x => x.Radio, area.Radius).SetProperty(x => x.GeographyJson, geography), ct);
+        }
         var after = await GetByIdAsync(disasterId, ct);
         var audit = Audit(before, after!, actor, "ReportAssociated", now);
-        audit.Changes = JsonSerializer.Serialize(new { ReportId = reportId, DisasterId = new { Before = (int?)null, After = disasterId }, Version = after!.Version });
+        var changes = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(audit.Changes!)!;
+        changes["ReportId"] = JsonSerializer.SerializeToElement(reportId);
+        audit.Changes = JsonSerializer.Serialize(changes);
         context.PhaseAudit.Add(audit);
+        if (area is not null) Enqueue(after!, "DisasterAreaChanged", now);
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return true;
+    }
+
+    private static void AddPoint(string content, List<(double Latitude, double Longitude)> points)
+    {
+        using var document = JsonDocument.Parse(content);
+        var fields = document.RootElement;
+        if (fields.ValueKind != JsonValueKind.Object) return;
+        JsonElement latitude = default, longitude = default;
+        foreach (var property in fields.EnumerateObject())
+        {
+            if (property.Name.Equals("latitud", StringComparison.OrdinalIgnoreCase)) latitude = property.Value;
+            if (property.Name.Equals("longitud", StringComparison.OrdinalIgnoreCase)) longitude = property.Value;
+        }
+        if (latitude.ValueKind == JsonValueKind.Number && longitude.ValueKind == JsonValueKind.Number
+            && latitude.TryGetDouble(out var lat) && longitude.TryGetDouble(out var lng)
+            && double.IsFinite(lat) && double.IsFinite(lng) && lat is >= -90 and <= 90 && lng is >= -180 and <= 180)
+            points.Add((lat, lng));
     }
 
     public async Task<bool> UpdateContextAsync(int id, long expectedVersion, string actor, string operation,
