@@ -11,6 +11,7 @@ public interface IDisasterRepository
         string? geographyJson, string? organizationsJson, string? registeringOrganizationId,
         string? emergencyResponsibleId, string? sourceId, CancellationToken ct);
     Task<IReadOnlyList<DisasterAlert>> GetAlertsAsync(int id, CancellationToken ct);
+    Task<DisasterSyncPage> GetChangesAsync(long after, int limit, DisasterScope scope, CancellationToken ct = default);
     Task<DisasterSyncPage> GetChangesAsync(long after, int limit, CancellationToken ct = default);
     Task<IReadOnlyList<Disaster>> GetAllAsync(CancellationToken ct = default);
     Task<Disaster?> GetByIdAsync(int id, CancellationToken ct = default);

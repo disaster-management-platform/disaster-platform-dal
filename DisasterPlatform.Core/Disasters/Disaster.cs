@@ -4,6 +4,8 @@ public sealed class Disaster
 {
     public int Id { get; set; }
     public Guid? ClientRequestId { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string? CreatedBy { get; set; }
     public required string Nombre { get; set; }
     public required string Ubicacion { get; set; }
     public int Severidad { get; set; }

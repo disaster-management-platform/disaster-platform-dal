@@ -9,6 +9,30 @@ namespace Platform.DAL.Repositories.Disasters;
 
 public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRepository
 {
+    public async Task<DisasterSyncPage> GetChangesAsync(long after, int limit, DisasterScope scope, CancellationToken ct = default)
+    {
+        var creator = JsonSerializer.Serialize(new { CreatedBy = scope.Actor });
+        var participant = JsonSerializer.Serialize(new[] { new { OrganizationId = scope.Organization } });
+        var owner = JsonSerializer.Serialize(new { RegisteringOrganizationId = scope.Organization });
+        var unknownOwner = JsonSerializer.Serialize(new { RegisteringOrganizationId = (string?)null });
+        var rows = await context.Disasters.AsNoTracking().Select(d => new {
+            Disaster = d,
+            LegacyOwner = d.CreationSnapshot == null || !EF.Functions.JsonExists(d.CreationSnapshot, "RegisteringOrganizationId")
+                || EF.Functions.JsonContains(d.CreationSnapshot, unknownOwner),
+            OriginalOwner = d.CreationSnapshot != null && EF.Functions.JsonContains(d.CreationSnapshot, owner)
+        }).Where(r =>
+            ((r.OriginalOwner || r.LegacyOwner && r.Disaster.RegisteringOrganizationId == scope.Organization)
+                && (scope.OrganizationWide || r.Disaster.CreationSnapshot != null && EF.Functions.JsonContains(r.Disaster.CreationSnapshot, creator)))
+            || scope.DisasterIds.Contains(r.Disaster.Id) && (r.OriginalOwner || r.LegacyOwner && r.Disaster.RegisteringOrganizationId == scope.Organization
+                || r.Disaster.OrganizationsJson != null && EF.Functions.JsonContains(r.Disaster.OrganizationsJson, participant)
+                || r.LegacyOwner && r.Disaster.RegisteringOrganizationId == null && (r.Disaster.OrganizationsJson == null || r.Disaster.OrganizationsJson == "[]" || r.Disaster.OrganizationsJson == "null")))
+            .Where(r => EF.Property<long>(r.Disaster, "SyncSequence") > after)
+            .OrderBy(r => EF.Property<long>(r.Disaster, "SyncSequence")).Take(limit + 1)
+            .Select(r => new { r.Disaster, Sequence = EF.Property<long>(r.Disaster, "SyncSequence") }).ToListAsync(ct);
+        var page = rows.Take(limit).ToArray();
+        return new(page.Select(r => r.Disaster).ToArray(), page.Length == 0 ? after : page[^1].Sequence, rows.Count > limit);
+    }
+
     public async Task<DisasterSyncPage> GetChangesAsync(long after, int limit, CancellationToken ct = default)
     {
         var rows = await context.Disasters.AsNoTracking().Where(d => EF.Property<long>(d, "SyncSequence") > after)
@@ -99,7 +123,7 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
     {
         d.Nombre, d.Ubicacion, d.Severidad, d.Descripcion, d.Latitud, d.Longitud, d.Radio,
         d.DisasterTypeId, d.StartedAt, d.RegisteredAt, d.UpdatedAt, d.AttentionLevel, d.Phase, d.Version,
-        d.RegisteringOrganizationId, d.EmergencyResponsibleId, d.GeographyJson, d.OrganizationsJson
+        d.RegisteringOrganizationId, d.EmergencyResponsibleId, d.GeographyJson, d.OrganizationsJson, d.CreatedBy
     });
     private static DisasterPhaseAudit Audit(Disaster before, Disaster after, string actor, string operation, DateTimeOffset now)
     {
