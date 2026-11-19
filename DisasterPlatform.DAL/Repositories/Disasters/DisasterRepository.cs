@@ -133,6 +133,13 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         try
         {
+            if (report.SourceId == "manual-web" && Guid.TryParse(report.SourceReportId, out var identity))
+            {
+                await LockIdentityAsync(identity, ct);
+                if (await GetByClientRequestIdAsync(identity, ct) is not null) throw new System.Data.DBConcurrencyException();
+                existing = await GetReportBySourceAsync(report.SourceId, report.SourceReportId, ct);
+                if (existing is not null) return new(existing, false);
+            }
             if (preliminary is not null)
             {
                 preliminary.CreationSnapshot = Snapshot(preliminary);
@@ -255,10 +262,17 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
         context.Outbox.Add(new DisasterOutboxMessage { Id = Guid.NewGuid(), DisasterId = disaster.Id,
             EventType = eventType, Version = disaster.Version, OccurredAt = now, Payload = JsonSerializer.Serialize(new { Disaster = JsonSerializer.Deserialize<JsonElement>(Snapshot(disaster)), SourceId = sourceId }) });
 
+    private async Task LockIdentityAsync(Guid identity, CancellationToken ct) =>
+        await context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({"disaster-operation:" + identity.ToString()}, 0))", ct);
+
     public async Task<DisasterSaveResult> AddAsync(Disaster disaster, CancellationToken ct = default)
     {
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
         if (disaster.ClientRequestId is Guid requestId)
         {
+            await LockIdentityAsync(requestId, ct);
+            if (await GetReportBySourceAsync("manual-web", requestId.ToString(), ct) is not null)
+                throw new System.Data.DBConcurrencyException();
             var existing = await GetByClientRequestIdAsync(requestId, ct);
             if (existing is not null) return new DisasterSaveResult(existing, false);
         }
@@ -267,12 +281,14 @@ public sealed class DisasterRepository(DisasterDbContext context) : IDisasterRep
         try
         {
             await context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
             return new DisasterSaveResult(disaster, true);
         }
         catch (DbUpdateException ex) when (disaster.ClientRequestId.HasValue &&
             ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation,
                 SchemaName: PlatformDatabase.DisasterSchema, ConstraintName: "IX_Desastres_ClientRequestId" })
         {
+            await transaction.RollbackAsync(ct);
             context.Entry(disaster).State = EntityState.Detached;
             var existing = await GetByClientRequestIdAsync(disaster.ClientRequestId.Value, ct);
             if (existing is null) throw;
